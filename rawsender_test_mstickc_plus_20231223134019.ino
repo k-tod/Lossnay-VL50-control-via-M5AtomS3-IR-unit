@@ -33,7 +33,7 @@ float tmp      = 0.0;
 float hum      = 0.0;
 float pressure = 0.0;
 
-CountDown CD(CountDown::MINUTES);
+CountDown CD(CountDown::SECONDS);
 
 uint32_t start, stop;
 
@@ -78,12 +78,12 @@ void loop()
     M5.lcd.setCursor(0, 20);
     M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\n", tmp, hum);
     
-    if (hum > 70) {
+    if (hum > 65) {
       sendRaw(fan_high);
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 10);
       M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanHigh  \r\n", tmp, hum);
-      CD.start(10); // 10 minutes
+      CD.start(600); // 10 minutes
       while (CD.remaining() > 0 ){
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 10);
@@ -97,7 +97,7 @@ void loop()
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 10);
       M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanLow  \r\n", tmp, hum);
-      CD.start(5); // 5 minutes
+      CD.start(300); // 5 minutes
       while (CD.remaining() > 0 ){
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 10);
@@ -107,7 +107,15 @@ void loop()
         }
   }
 
-    delay(60000); // wait 1 minute
+    // delay(60000); // wait 1 minute
+    CD.start(60); // 5 minutes
+    while (CD.remaining() > 0 ){
+      M5.Lcd.fillScreen(BLACK);
+      M5.Lcd.setCursor(0, 10);
+      M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanLow  \r\n", tmp, hum);
+      M5.Lcd.printf("Wait between checks: %u \r\n", CD.remaining());
+      delay(1000);
+    }
 
   // ####################################################################################################
 
