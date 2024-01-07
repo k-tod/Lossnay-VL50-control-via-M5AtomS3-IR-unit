@@ -4,6 +4,8 @@
 #include <HeatpumpIR.h>
 #include "CountDown.h"
 #include "PinDefinitionsAndMore.h"
+#include <SparkFun_FS3000_Arduino_Library.h> //Click here to get the library: http://librarymanager/All#SparkFun_FS3000
+#include "AXP192.h"
 
 #ifndef ESP8266
 IRSenderESP32 irSender(32, 0);     // IR led on ESP22 digital pin 32, 0 - ESP32 LEDC channel. 
@@ -28,6 +30,8 @@ bool fanState = false; // Initialize fan state to low
 
 SHT3X sht30;
 QMP6988 qmp6988;
+FS3000 flowsensor;
+
 
 float tmp      = 0.0;
 float hum      = 0.0;
@@ -43,8 +47,7 @@ void setup()
   Serial.begin(115200);
   delay(500);
   M5.begin();
-  M5.Lcd.setRotation(1);
-  // text print
+  // M5.Lcd.setRotation(1);
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setCursor(0, 10);
   M5.Lcd.setTextColor(WHITE);
@@ -55,12 +58,32 @@ void setup()
   start = millis();
   CD.start(3);
   Serial.println(start);
+  if (flowsensor.begin() == false) //Begin communication over I2C
+  {
+    Serial.println("The Flow sensor did not respond. Please check wiring.");
+    // while(1); //Freeze
+    delay(5000);
+  }
+  M5.Axp.EnableCoulombcounter();  // Enable Coulomb counter.
+
+  // Set the range to match which version of the sensor you are using.
+  flowsensor.setRange(AIRFLOW_RANGE_7_MPS);
 
   Serial.println(F("Starting..."));
 }
 
 void loop()
-{     
+{ 
+  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.setCursor(0, 10);
+  M5.Lcd.printf("ReadRaw: %d  \r\n", flowsensor.readRaw());
+  M5.Lcd.printf("m/s: %.2f  \r\n", flowsensor.readMetersPerSecond());
+  M5.Lcd.printf("mph: %.2f  \r\n", flowsensor.readMilesPerHour());
+  M5.Lcd.printf("Bat: %.3fV I: %.2fmA\r\n", M5.Axp.GetBatVoltage(), M5.Axp.GetBatCurrent());
+  delay(250);
+
+
+
   char fan_high[1024] = "Hh1100010011010011011010000010001010000000100100010101000000001101";
   char fan_low[1024] = "Hh1100010011010011011010000010001010000000100100011101000000000101";
   pressure = qmp6988.calcPressure();
@@ -76,46 +99,81 @@ void loop()
                     BLACK);  // Fill the screen with black (to clear the
                              // screen).  将屏幕填充黑色(用来清屏)
     M5.lcd.setCursor(0, 20);
-    M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\n", tmp, hum);
+    M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%", tmp, hum);
     
     if (hum > 65) {
-      sendRaw(fan_high);
-      M5.Lcd.fillScreen(BLACK);
-      M5.Lcd.setCursor(0, 10);
-      M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanHigh  \r\n", tmp, hum);
+      if ((flowsensor.readRaw() < 1200) && (flowsensor.readRaw() > 600)){
+        sendRaw(fan_high);
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setCursor(0, 10);
+        M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nSet Fan +  \r\nFlow: %d  \r\n", tmp, hum, flowsensor.readRaw());
+        delay(5000);
+      }else{
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setCursor(0, 10);
+        M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nFan ~  \r\nFlow: %d \r\n", tmp, hum, flowsensor.readRaw());
+        delay(5000);
+      }
       CD.start(600); // 10 minutes
       while (CD.remaining() > 0 ){
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 10);
-        M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanHigh  \r\n", tmp, hum);
+        M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nFlow: %d  \r\nBat: %.3fV\r\nI: %.2fmA\r\n", tmp, hum, flowsensor.readRaw(), M5.Axp.GetBatVoltage(), M5.Axp.GetBatCurrent());
         M5.Lcd.printf("Wait: %u \r\n", CD.remaining());
         delay(1000);
         }
 
     } else {
+      if (flowsensor.readRaw() > 1200){
       sendRaw(fan_low);
       M5.Lcd.fillScreen(BLACK);
       M5.Lcd.setCursor(0, 10);
-      M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanLow  \r\n", tmp, hum);
+      M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nSet Fan -  \r\nFlow: %d  \r\n", tmp, hum, flowsensor.readRaw());
+      delay(5000);
+      }else{
+        M5.Lcd.fillScreen(BLACK);
+        M5.Lcd.setCursor(0, 10);
+        M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nFan ~ \r\nFlow: %d  \r\n", tmp, hum, flowsensor.readRaw());
+        delay(5000);
+      }
       CD.start(300); // 5 minutes
       while (CD.remaining() > 0 ){
         M5.Lcd.fillScreen(BLACK);
         M5.Lcd.setCursor(0, 10);
-        M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanLow  \r\n", tmp, hum);
+        M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%\r\nFlow: %d  \r\nBat: %.3fV\r\nI: %.2fmA\r\n", tmp, hum, flowsensor.readRaw(), M5.Axp.GetBatVoltage(), M5.Axp.GetBatCurrent());
         M5.Lcd.printf("Wait: %u \r\n", CD.remaining());
         delay(1000);
         }
   }
 
     // delay(60000); // wait 1 minute
-    CD.start(60); // 5 minutes
-    while (CD.remaining() > 0 ){
-      M5.Lcd.fillScreen(BLACK);
-      M5.Lcd.setCursor(0, 10);
-      M5.Lcd.printf("Temp: %2.1f  \r\nHumi: %2.0f%%  \r\nFanLow  \r\n", tmp, hum);
-      M5.Lcd.printf("Wait between checks: %u \r\n", CD.remaining());
-      delay(1000);
-    }
+    // CD.start(60); // 5 minutes
+    // while (CD.remaining() > 0 ){
+    //   M5.Lcd.fillScreen(BLACK);
+    //   M5.Lcd.setCursor(0, 10);
+    //   M5.Lcd.printf("Temp: %2.1f  \r\nHum:%2.0f%%FanLow  \r\n", tmp, hum);
+    //   M5.Lcd.printf("Wait between checks: %u \r\n", CD.remaining());
+    //   delay(1000);
+    // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   // ####################################################################################################
 
