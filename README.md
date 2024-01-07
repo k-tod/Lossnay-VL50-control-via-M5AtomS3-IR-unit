@@ -9,16 +9,14 @@ When the humidity is above a certain threshold, it turns the fan on to a high se
 - Temperature and humidity sensor (SHT3X)
 - Pressure sensor (QMP6988)
 - Infrared (IR) sender
+- FS1015(Airflow) sensor
 
 ## Libraries Used
 
 - [M5StickCPlus](https://github.com/m5stack/M5StickC-Plus)
 - [HeatpumpIR](https://github.com/ToniA/arduino-heatpumpir)
 - [CountDown](https://github.com/RobTillaart/CountDown)
-- [PinDefinitionsAndMore](https://github.com/IRMP-org/IRMP/blob/master/examples/SimpleSender/PinDefinitionsAndMore.h)
-  - Additionally, I adapted the ESP32 pins in "PinDefinitionsAndMore.h"  to match the pins of IR unit on my M5StickC-Plus like so:
-    - IRMP_INPUT_PIN:   from 15 to 33
-    - IRSND_OUTPUT_PIN: from 4 to 32
+= [FS3000](https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main)
 
 ## Usage
 
@@ -26,9 +24,10 @@ When the humidity is above a certain threshold, it turns the fan on to a high se
 
 2. Upload this Arduino sketch to your M5Stack device.
 
-3. The sketch will monitor the temperature and humidity. When the humidity exceeds a certain threshold (70% in this example), it will activate the fan on a high setting via IR command. Otherwise, it will run the fan on a low setting.
+3. The sketch will monitor the temperature and humidity. When the humidity exceeds a certain threshold (65% in this example), it will activate the fan on a high setting via IR command. Otherwise, it will run the fan on a low setting.
+4. There is also a feedback loop implemented to check if the IR command was succesfull, via a Airflow sensor(Renesas FS1015)
 
-5. The display will show temperature, humidity, and fan status.
+5. The display will show temperature, humidity, Raw Airflow value and fan status.
 
 6. Adjust the thresholds and timings in the code as needed for your specific application.
 
