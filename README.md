@@ -17,7 +17,7 @@ The code also uses infrared (IR) signals to control the fan and a feedback loop 
 - [M5StickCPlus](https://github.com/m5stack/M5StickC-Plus)
 - [HeatpumpIR](https://github.com/ToniA/arduino-heatpumpir)
 - [CountDown](https://github.com/RobTillaart/CountDown)
-= [FS3000](https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main)
+- [FS3000](https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main)
 
 ## Usage
 
