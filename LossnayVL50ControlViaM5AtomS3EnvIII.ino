@@ -30,10 +30,37 @@ char fan_high[1024] = "Hh1100010011010011011010000010001010000000100100010101000
 char fan_low[1024] = "Hh1100010011010011011010000010001010000000100100011101000000000101";
 char fan_off[1024] = "Hh1100010011010011011010000010001010000000100100010000000000001000";
 
-CountDown CD(CountDown::SECONDS);
+unsigned long previousMillis = 0;
+const long interval = 5000;
+
+enum FanState {
+  FAN_OFF,
+  FAN_LOW,
+  FAN_HIGH
+};
+
+FanState fanState = FAN_OFF;
+
+const int BUTTON_PRESS_INTERVAL = 500; // Maximum time between button presses to count as a single press
+unsigned long lastButtonPress = 0;
+int buttonPressCount = 0;
+
+// Default thresholds
+const float DEFAULT_HIGH_THRESHOLD = 65.0;
+const float DEFAULT_LOW_THRESHOLD = 45.0;
+
+// Configurable thresholds
+float highThreshold = DEFAULT_HIGH_THRESHOLD;
+float lowThreshold = DEFAULT_LOW_THRESHOLD;
+
+// Manual override management
+bool manualOverride = false;
+unsigned long manualOverrideStartTime = 0;
+const unsigned long manualOverrideDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 void setup() {
   M5.begin();
+  Serial.begin(115200);
   Wire.begin(2, 1);
   AtomS3.Lcd.setRotation(2);
   AtomS3.Lcd.fillScreen(BLACK);
@@ -44,57 +71,131 @@ void setup() {
   flowsensor.begin();
   flowsensor.setRange(AIRFLOW_RANGE_7_MPS);
   sht30.init();
-  CD.start(3);
 }
 
 void loop() {
-  if (sht30.get() == 0) {
-    tmp = sht30.cTemp;
-    hum = sht30.humidity;
-  } else {
-    tmp = 0, hum = 0;
-  }
-
-  String fanStatus = "Fan ~";
-  if (hum > 65) {
-    if (flowsensor.readRaw() < 1200) { // if it is on low
-      sendRaw(fan_high);
-      fanStatus = "Set Fan +";
-      delay(5000);
-    } else {
-      updateLCD(tmp, hum, flowsensor.readRaw(), fanStatus);
-      delay(5000);
-    }
-    CD.start(600);
-  } else if ((hum < 65) && hum > 45) {
-    if ((flowsensor.readRaw() < 600) || (flowsensor.readRaw() > 1200)) { // if it is on off or on high
-      sendRaw(fan_low);
-      fanStatus = "Set Fan -";
-      delay(5000);
-    } else {
-      updateLCD(tmp, hum, flowsensor.readRaw(), fanStatus);
-      delay(5000);
-    }
-    CD.start(60);
-  } else if (hum < 45) { // Humidity below 45%, turn fan off
-      if (flowsensor.readRaw() > 600) { // if it is on low
-        sendRaw(fan_off);
-        fanStatus = "Set Fan OFF";
-        delay(5000);
-      } else {
-        updateLCD(tmp, hum, flowsensor.readRaw(), fanStatus);
-        delay(5000);
-    }
-    CD.start(60);
-  }
-
-  while (CD.remaining() > 0) {
-    updateLCD(tmp, hum, flowsensor.readRaw(), "Wait " + String(CD.remaining()) + "s");
-    delay(1000);
-  }
-
-  updateLCD(tmp, hum, flowsensor.readRaw(), fanStatus);
   M5.update();
+  unsigned long currentMillis = millis();
+
+  if (AtomS3.BtnA.wasPressed()) {
+    handleButtonPress();
+  }
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    if (sht30.get() == 0) {
+      tmp = sht30.cTemp;
+      hum = sht30.humidity;
+    } else {
+      tmp = 0, hum = 0;
+    }
+
+    if (!manualOverride) {
+      updateFanState();
+    } else if (currentMillis - manualOverrideStartTime >= manualOverrideDuration) {
+      manualOverride = false; // Disable manual override after the duration
+      updateFanState(); // Update fan state after manual override ends
+    }
+
+    updateLCD(tmp, hum, flowsensor.readRaw(), getFanStatus());
+  }
+
+  checkFanState();
+}
+
+void handleButtonPress() {
+  buttonPressCount = (buttonPressCount + 1) % 4;
+
+  switch (buttonPressCount) {
+    case 0:
+      highThreshold = DEFAULT_HIGH_THRESHOLD;
+      lowThreshold = DEFAULT_LOW_THRESHOLD;
+      break;
+    case 1:
+      highThreshold = DEFAULT_HIGH_THRESHOLD + 5;
+      lowThreshold = DEFAULT_LOW_THRESHOLD + 5;
+      break;
+    case 2:
+      highThreshold = DEFAULT_HIGH_THRESHOLD + 10;
+      lowThreshold = DEFAULT_LOW_THRESHOLD + 10;
+      break;
+    case 3:
+      highThreshold = DEFAULT_HIGH_THRESHOLD + 15;
+      lowThreshold = DEFAULT_LOW_THRESHOLD + 15;
+      break;
+  }
+
+  Serial.print("Thresholds updated: High=");
+  Serial.print(highThreshold);
+  Serial.print(" Low=");
+  Serial.println(lowThreshold);
+}
+
+void updateFanState() {
+  if (hum > highThreshold) {
+    if (fanState != FAN_HIGH) {
+      setFanState(FAN_HIGH);
+    }
+  } else if (hum > lowThreshold) {
+    if (fanState != FAN_LOW) {
+      setFanState(FAN_LOW);
+    }
+  } else {
+    if (fanState != FAN_OFF) {
+      setFanState(FAN_OFF);
+    }
+  }
+}
+
+void setFanState(FanState newState) {
+  fanState = newState;
+  switch (fanState) {
+    case FAN_OFF:
+      sendRaw(fan_off);
+      break;
+    case FAN_LOW:
+      sendRaw(fan_low);
+      break;
+    case FAN_HIGH:
+      sendRaw(fan_high);
+      break;
+  }
+}
+
+void checkFanState() {
+  int airflow = flowsensor.readRaw();
+  Serial.print("Airflow: ");
+  Serial.println(airflow);
+
+  FanState currentFanState;
+  if (airflow > 1200) {
+    currentFanState = FAN_HIGH;
+  } else if (airflow > 600) {
+    currentFanState = FAN_LOW;
+  } else {
+    currentFanState = FAN_OFF;
+  }
+
+  if (currentFanState != fanState) {
+    manualOverride = true;
+    manualOverrideStartTime = millis();
+    fanState = currentFanState;
+
+    Serial.println("Manual override detected");
+  }
+}
+
+String getFanStatus() {
+  switch (fanState) {
+    case FAN_OFF:
+      return "Fan OFF";
+    case FAN_LOW:
+      return "Fan LOW";
+    case FAN_HIGH:
+      return "Fan HIGH";
+  }
+  return "Fan ~";
 }
 
 void sendRaw(char *symbols) {
@@ -128,7 +229,6 @@ void sendRaw(char *symbols) {
   irSender.space(0);
 }
 
-// Function to update LCD display
 void updateLCD(float temperature, float humidity, int flowReading, String fanStatus) {
   AtomS3.Lcd.fillRect(3, 0, 135, 25, BLACK);
   AtomS3.Lcd.drawString(String(temperature) + " deg  ", 3, 0);
@@ -141,4 +241,27 @@ void updateLCD(float temperature, float humidity, int flowReading, String fanSta
 
   AtomS3.Lcd.fillRect(3, 75, 135, 25, BLACK);
   AtomS3.Lcd.drawString(fanStatus, 3, 75);
+
+  String thresholdInfo = "";
+  switch (buttonPressCount) {
+    case 0:
+      thresholdInfo = "+0%";
+      break;
+    case 1:
+      thresholdInfo = "+5%";
+      break;
+    case 2:
+      thresholdInfo = "+10%";
+      break;
+    case 3:
+      thresholdInfo = "+15%";
+      break;
+  }
+
+  if (manualOverride) {
+    thresholdInfo += " Man";
+  }
+
+  AtomS3.Lcd.fillRect(3, 100, 135, 25, BLACK);
+  AtomS3.Lcd.drawString(thresholdInfo, 3, 100);
 }
