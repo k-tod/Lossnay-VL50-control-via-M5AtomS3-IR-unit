@@ -5,10 +5,19 @@
 #include "CountDown.h"
 #include <SparkFun_FS3000_Arduino_Library.h>
 
+// The following projects were used as inspiration for creating this particular sketch:
+// - https://github.com/ToniA/arduino-heatpumpir/blob/master/examples/rawsender/rawsender.ino
+// - https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main/examples/Example01_BasicReadings
+
+//   - you can also use another flowSensor from Renesas, like FS1015,
+//     - to do that , you would have to change the FS3000_DEVICE_ADDRESS to 0x50 in "SparkFun_FS3000_Arduino_Library.h"
+
 SHT3X sht30;
 FS3000 flowsensor;
-IRSenderESP32 irSender(39, 0);
+IRSenderESP32 irSender(39, 0);  // IR led on M5Stack IR Unit()SKU:U002, which is connected via a grove connector to ESP22 digital pin 39, 0 - ESP32 LEDC channel.
+                                // more info at: https://docs.m5stack.switch-science.com/en/unit/ir
 
+// IR communication timings specific to Lossnay VL-50
 #define IR_PAUSE_SPACE 0
 #define IR_HEADER_MARK 3220
 #define IR_HEADER_SPACE 1584
