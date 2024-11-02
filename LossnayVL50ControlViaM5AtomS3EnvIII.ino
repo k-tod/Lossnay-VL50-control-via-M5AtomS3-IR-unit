@@ -100,7 +100,7 @@ void loop() {
     } else if (currentMillis - manualOverrideStartTime >= manualOverrideDuration) {
       manualOverride = false; // Disable manual override after the duration
       updateFanState(); // Update fan state after manual override ends
-    }
+        }
 
     updateLCD(tmp, hum, flowsensor.readRaw(), getFanStatus());
   }
@@ -271,7 +271,10 @@ void updateLCD(float temperature, float humidity, int flowReading, String fanSta
   }
 
   if (manualOverride) {
-    thresholdInfo += " Man";
+    thresholdInfo = "Man Override";
+  }
+  else{
+    thresholdInfo = thresholdInfo;
   }
 
   AtomS3.Lcd.fillRect(3, 100, 135, 25, BLACK);
