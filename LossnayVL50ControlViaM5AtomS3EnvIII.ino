@@ -5,18 +5,10 @@
 #include "CountDown.h"
 #include <SparkFun_FS3000_Arduino_Library.h>
 
-// This sketch is heavily based on the followingsketches:
-// - https://github.com/ToniA/arduino-heatpumpir/blob/master/examples/rawsender/rawsender.ino
-// - https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main/examples/Example01_BasicReadings
-//   - you can also use another flowSensor from Renesas, like FS1015,
-//     - to do that , you would have to change the FS3000_DEVICE_ADDRESS to 0x50 in "SparkFun_FS3000_Arduino_Library.h"
-
 SHT3X sht30;
 FS3000 flowsensor;
-IRSenderESP32 irSender(39, 0);  // IR led on M5Stack IR Unit()SKU:U002, which is connected via a grove connector to ESP22 digital pin 39, 0 - ESP32 LEDC channel.
-                                // more info at: https://docs.m5stack.switch-science.com/en/unit/ir
+IRSenderESP32 irSender(39, 0);
 
-// IR communication timings specific to Lossnay VL-50
 #define IR_PAUSE_SPACE 0
 #define IR_HEADER_MARK 3220
 #define IR_HEADER_SPACE 1584
@@ -54,6 +46,9 @@ float highThreshold = DEFAULT_HIGH_THRESHOLD;
 float lowThreshold = DEFAULT_LOW_THRESHOLD;
 
 // Manual override management
+bool autoHighState = false;
+unsigned long lastAutoHighTime = 0; // To track when auto high was last triggered
+const unsigned long debounceDuration = 5000; // 5 seconds debounce durationv
 bool manualOverride = false;
 unsigned long manualOverrideStartTime = 0;
 const unsigned long manualOverrideDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
@@ -149,6 +144,8 @@ void updateFanState() {
 }
 
 void setFanState(FanState newState) {
+  autoHighState = true;
+  lastAutoHighTime = millis(); // Record the current time
   fanState = newState;
   switch (fanState) {
     case FAN_OFF:
@@ -164,6 +161,11 @@ void setFanState(FanState newState) {
 }
 
 void checkFanState() {
+  // Check if enough time has passed since the last auto high trigger
+  if (autoHighState && (millis() - lastAutoHighTime < debounceDuration)) {
+      // Still within debounce duration, skip manual override detection
+      return;
+  }
   int airflow = flowsensor.readRaw();
   Serial.print("Airflow: ");
   Serial.println(airflow);
@@ -181,6 +183,7 @@ void checkFanState() {
     manualOverride = true;
     manualOverrideStartTime = millis();
     fanState = currentFanState;
+    autoHighState = false; // Only reset here after confirming the override
 
     Serial.println("Manual override detected");
   }
