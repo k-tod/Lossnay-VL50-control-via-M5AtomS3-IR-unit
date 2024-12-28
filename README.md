@@ -6,18 +6,11 @@ The code also uses infrared (IR) signals to control the fan and a feedback loop 
 
 ## Hardware Requirements
 
-- M5Stack device (specifically M5StickC+)
-- Temperature and humidity sensor (SHT3X)
-- Pressure sensor (QMP6988)
-- Infrared (IR) sender
-- FS1015(Airflow) sensor
+- M5Stack device (specifically M5AtomS3)
+- Temperature and humidity sensor (M5 Env IV)
+- Infrared (IR) sender(M5 IR Unit)
+- Airflow sensor (Renesas FS1015)
 
-## Libraries Used
-
-- [M5StickCPlus](https://github.com/m5stack/M5StickC-Plus)
-- [HeatpumpIR](https://github.com/ToniA/arduino-heatpumpir)
-- [CountDown](https://github.com/RobTillaart/CountDown)
-- [FS3000](https://github.com/sparkfun/SparkFun_FS3000_Arduino_Library/tree/main)
 
 ## Usage
 
