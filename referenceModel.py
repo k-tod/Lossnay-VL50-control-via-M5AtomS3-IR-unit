@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate import make_interp_spline
+from pathlib import Path
+import csv
 
 # Function to simulate a more subtle delayed response in air flow
 def subtle_delayed_response(speed_array, total_time, delay_seconds=10):
@@ -11,20 +13,38 @@ def subtle_delayed_response(speed_array, total_time, delay_seconds=10):
         delayed_array[i] = speed_array[i - delay_steps]
     return delayed_array
 
-# Adjusting the time scale to 120 minutes
-time_120min = np.linspace(0, 120, 20)  # 20 data points spread over 120 minutes
+# CSV path (same folder as this script) - assume series.csv already exists
+csv_path = Path(__file__).parent / 'series.csv'
+if not csv_path.exists():
+    raise FileNotFoundError(f"series.csv not found at {csv_path}")
 
-# Redefine the humidity levels for a smoother curve over 120 minutes
-humidity = np.array([50, 55, 68, 75, 78, 65, 50, 43, 45, 50, 50, 55, 56, 55, 56, 57, 55, 54, 52, 53])
+# Read CSV
+times = []
+humidities = []
+fan_speeds = []
+manual_overrides = []
 
-# Define the fan speed levels and manual override
-fan_speed = np.array([1, 1, 2, 2, 2, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1])
-manual_override = np.zeros_like(fan_speed)
-manual_override[15] = 1  # Override at the 16th point
-for i in range(len(fan_speed)-1):
+with csv_path.open('r', newline='') as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        if not row or all((v is None or str(v).strip() == '') for v in row.values()):
+            continue
+        times.append(float(row['time']))
+        humidities.append(float(row['humidity']))
+        fan_speeds.append(int(float(row['fan_speed'])))
+        manual_overrides.append(int(float(row['manual_override'])))
+
+# Convert to numpy arrays
+time_120min = np.array(times, dtype=float)
+humidity = np.array(humidities, dtype=float)
+fan_speed = np.array(fan_speeds, dtype=int)
+manual_override = np.array(manual_overrides, dtype=int)
+
+# Re-apply manual override logic (in case CSV contains override flags)
+for i in range(len(fan_speed) - 1):
     if manual_override[i] == 1:
         fan_speed[i] = 2
-        fan_speed[i+1] = 2
+        fan_speed[i + 1] = 2
 
 # Total time in minutes and delay in seconds
 total_time_minutes = 120
@@ -67,6 +87,4 @@ ax4.set_xlabel('Time (minutes)')
 
 # Adjust layout
 plt.tight_layout()
-
-# Show the plot
 plt.show()

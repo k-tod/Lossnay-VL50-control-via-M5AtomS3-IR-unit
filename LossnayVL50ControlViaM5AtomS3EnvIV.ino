@@ -106,9 +106,7 @@ void loop() {
     }
     updateLCD(tmp, hum, flowsensor.readRaw(), getFanStatus());
   }
-
   checkFanState();
-
 }
 
 void handleButtonPress() {
@@ -140,11 +138,13 @@ void handleButtonPress() {
 }
 
 void updateFanState() {
+  const float hysteresisMargin = 5.0; // Hysteresis margin to prevent rapid toggling
+
   // If the fan is OFF, check if it should restart
   if (fanState == FAN_OFF) {
     if (fanRecentlyTurnedOff) {
-      // Enforce hysteresis: Restart only if humidity exceeds lowThreshold + 5
-      if (hum > lowThreshold + 5) {
+      // Enforce hysteresis: Restart only if humidity exceeds lowThreshold + hysteresisMargin
+      if (hum > lowThreshold + hysteresisMargin) {
         setFanState(FAN_LOW); // Restart fan in LOW mode
         fanRecentlyTurnedOff = false; // Reset hysteresis flag
       }
@@ -154,22 +154,18 @@ void updateFanState() {
         setFanState(FAN_LOW); // Start fan in LOW mode
       }
     }
-  } else {
-    // If the fan is ON (either LOW or HIGH), apply normal threshold logic
-    if (hum > highThreshold) {
-      if (fanState != FAN_HIGH) {
-        setFanState(FAN_HIGH); // Switch to HIGH mode
-      }
-    } else if (hum > lowThreshold) {
-      if (fanState != FAN_LOW) {
-        setFanState(FAN_LOW); // Switch to LOW mode
-      }
-    } else {
-      // Humidity is below lowThreshold: Turn fan OFF
-      if (fanState != FAN_OFF) {
-        setFanState(FAN_OFF); // Turn fan OFF
-        fanRecentlyTurnedOff = true; // Mark the fan as recently turned off
-      }
+  } else if (fanState == FAN_LOW) {
+    // If the fan is in LOW mode, check thresholds for HIGH or OFF
+    if (hum > highThreshold + hysteresisMargin) {
+      setFanState(FAN_HIGH); // Switch to HIGH mode
+    } else if (hum < lowThreshold - hysteresisMargin) {
+      setFanState(FAN_OFF); // Turn fan OFF
+      fanRecentlyTurnedOff = true; // Mark the fan as recently turned off
+    }
+  } else if (fanState == FAN_HIGH) {
+    // If the fan is in HIGH mode, check thresholds for LOW
+    if (hum < highThreshold - hysteresisMargin) {
+      setFanState(FAN_LOW); // Switch to LOW mode
     }
   }
 }
